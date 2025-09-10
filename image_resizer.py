@@ -7,7 +7,7 @@ class ImageResizerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Image Resizer Pro")
-        self.root.geometry("700x850")
+        self.root.geometry("700x750")
         self.root.resizable(False, False)
         
         # Modern color scheme
@@ -43,11 +43,11 @@ class ImageResizerApp:
         """Create modern, sleek UI"""
         # Main container with padding
         main_container = tk.Frame(self.root, bg=self.colors['bg'])
-        main_container.pack(fill='both', expand=True, padx=25, pady=25)
+        main_container.pack(fill='both', expand=True, padx=15, pady=10)
         
         # Title section
         title_frame = tk.Frame(main_container, bg=self.colors['bg'])
-        title_frame.pack(fill='x', pady=(0, 30))
+        title_frame.pack(fill='x', pady=(0, 15))
         
         title_label = tk.Label(
             title_frame, 
@@ -65,7 +65,7 @@ class ImageResizerApp:
             fg=self.colors['text_secondary'],
             bg=self.colors['bg']
         )
-        subtitle_label.pack(pady=(5, 0))
+        subtitle_label.pack(pady=(2, 0))
         
         # Input file section
         self.create_section(main_container, "Select Images", self.create_input_section)
@@ -88,7 +88,7 @@ class ImageResizerApp:
     def create_section(self, parent, title, content_func):
         """Create a modern section with title and content"""
         section_frame = tk.Frame(parent, bg=self.colors['bg'])
-        section_frame.pack(fill='x', pady=(0, 25))
+        section_frame.pack(fill='x', pady=(0, 15))
         
         # Section title
         title_label = tk.Label(
@@ -109,7 +109,7 @@ class ImageResizerApp:
             highlightbackground=self.colors['border'],
             highlightthickness=1
         )
-        content_frame.pack(fill='x', ipady=15, ipadx=15)
+        content_frame.pack(fill='x', ipady=10, ipadx=15)
         
         # Create section content
         content_func(content_frame)
@@ -203,7 +203,7 @@ class ImageResizerApp:
         self.image_canvas = tk.Canvas(
             canvas_container,
             bg=self.colors['surface'],
-            height=200,  # Fixed height for preview area
+            height=120,  # Fixed height for preview area
             highlightthickness=0
         )
         
@@ -513,7 +513,7 @@ class ImageResizerApp:
     def create_progress_section(self, parent):
         """Create progress section for batch processing"""
         self.progress_section_frame = tk.Frame(parent, bg=self.colors['bg'])
-        self.progress_section_frame.pack(fill='x', pady=(0, 25))
+        self.progress_section_frame.pack(fill='x', pady=(0, 15))
         self.progress_section_frame.pack_forget()  # Hide initially
         
         # Section title
@@ -535,7 +535,7 @@ class ImageResizerApp:
             highlightbackground=self.colors['border'],
             highlightthickness=1
         )
-        progress_container.pack(fill='x', ipady=15, ipadx=15)
+        progress_container.pack(fill='x', ipady=8, ipadx=15)
         
         # Progress label
         self.progress_label = tk.Label(
@@ -570,7 +570,7 @@ class ImageResizerApp:
     def create_action_button(self, parent):
         """Create the main action button"""
         button_frame = tk.Frame(parent, bg=self.colors['bg'])
-        button_frame.pack(fill='x', pady=(20, 0))
+        button_frame.pack(fill='x', pady=(10, 0))
         
         self.resize_button = tk.Button(
             button_frame,
@@ -848,7 +848,7 @@ class ImageResizerApp:
         failed_resizes = []
         
         # Show progress section
-        self.progress_section_frame.pack(fill='x', pady=(0, 25))
+        self.progress_section_frame.pack(fill='x', pady=(0, 15))
         
         # Disable button during processing
         original_text = self.resize_button.cget('text')
