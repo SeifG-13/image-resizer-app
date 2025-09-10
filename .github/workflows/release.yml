@@ -48,17 +48,19 @@ jobs:
         - Built with PyInstaller for Windows
         
         ## Download
+        **📁 Download the .exe file only - no installation needed!**
+        
         - **File:** ImageResizerPro.exe
         - **Size:** ${fileSize} MB
         - **Platform:** Windows 10/11 (64-bit)
         
         ## Installation
-        1. Download ImageResizerPro.exe
-        2. Run the executable (Windows may show a security warning for unsigned executables)
-        3. No installation required - it's a portable application
+        1. **Download ImageResizerPro.exe** (the only file you need)
+        2. **Double-click to run** - no installation required!
+        3. Windows may show a security warning for unsigned files - click "More info" → "Run anyway"
         
-        ## Verification
-        Verify download integrity using the checksums in checksums.txt
+        ## File Verification
+        SHA256: See checksums.txt for integrity verification
         
         ## System Requirements
         - Windows 10 or later
@@ -72,7 +74,6 @@ jobs:
       with:
         files: |
           dist/ImageResizerPro.exe
-          checksums.txt
         body_path: release-notes.md
         draft: false
         prerelease: false
