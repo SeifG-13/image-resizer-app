@@ -1,0 +1,27 @@
+﻿# Checksums for ImageResizerPro.exe
+# File size: 27535272 bytes
+# Generated: 2025-09-10 09:37:30 UTC
+
+## SHA256
+5c2e3b685afc292029ee0acf62f14f582869d308fb1c09afd9d9d8c08fb5d0a5  ImageResizerPro.exe
+
+## SHA1
+8124db050a973503e8cd741fa73864d7234ec75f  ImageResizerPro.exe
+
+## MD5
+3cfa5c273c67a217e9a9fe4cd11d1983  ImageResizerPro.exe
+
+## Verification Instructions
+To verify the integrity of your download:
+
+### Windows (PowerShell):
+`powershell
+Get-FileHash -Path "ImageResizerPro.exe" -Algorithm SHA256
+`
+
+### Linux/macOS:
+`ash
+sha256sum "ImageResizerPro.exe"
+`
+
+The output should match the SHA256 hash above.
