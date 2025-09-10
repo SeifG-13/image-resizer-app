@@ -7,7 +7,7 @@ class ImageResizerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Image Resizer Pro")
-        self.root.geometry("520x650")
+        self.root.geometry("700x850")
         self.root.resizable(False, False)
         
         # Modern color scheme
@@ -32,6 +32,9 @@ class ImageResizerApp:
         self.output_path_var = tk.StringVar()
         self.width_var = tk.StringVar()
         self.height_var = tk.StringVar()
+        self.selected_images = []  # Store list of selected image paths
+        self.selected_image_widgets = []  # Store widgets that are currently selected for removal
+        self.image_preview_widgets = []  # Store all image preview widgets
         
         # Create modern UI
         self.create_modern_ui()
@@ -65,7 +68,7 @@ class ImageResizerApp:
         subtitle_label.pack(pady=(5, 0))
         
         # Input file section
-        self.create_section(main_container, "Select Image", self.create_input_section)
+        self.create_section(main_container, "Select Images", self.create_input_section)
         
         # Presets section
         self.create_section(main_container, "Quick Presets", self.create_presets_section)
@@ -75,6 +78,9 @@ class ImageResizerApp:
         
         # Output section
         self.create_section(main_container, "Output Location", self.create_output_section)
+        
+        # Progress section (initially hidden)
+        self.create_progress_section(main_container)
         
         # Action button
         self.create_action_button(main_container)
@@ -109,31 +115,19 @@ class ImageResizerApp:
         content_func(content_frame)
         
     def create_input_section(self, parent):
-        """Create modern input file section"""
+        """Create modern input file section with multiple image support"""
         input_container = tk.Frame(parent, bg=self.colors['surface'])
         input_container.pack(fill='x')
         
-        # Entry with modern styling
-        entry_frame = tk.Frame(input_container, bg=self.colors['surface'])
-        entry_frame.pack(side='left', fill='x', expand=True, padx=(0, 10))
+        # Button controls
+        button_frame = tk.Frame(input_container, bg=self.colors['surface'])
+        button_frame.pack(fill='x', pady=(0, 10))
         
-        self.input_entry = tk.Entry(
-            entry_frame,
-            textvariable=self.input_path_var,
-            font=('Segoe UI', 10),
-            bg=self.colors['bg'],
-            fg=self.colors['text'],
-            relief='solid',
-            bd=1,
-            insertbackground=self.colors['text']
-        )
-        self.input_entry.pack(fill='x', ipady=8, ipadx=10)
-        
-        # Modern browse button
+        # Browse multiple images button
         browse_btn = tk.Button(
-            input_container,
-            text="Browse",
-            command=self.open_file,
+            button_frame,
+            text="Select Images",
+            command=self.open_multiple_files,
             font=('Segoe UI', 10, 'bold'),
             bg=self.colors['primary'],
             fg=self.colors['text'],
@@ -143,10 +137,248 @@ class ImageResizerApp:
             pady=10,
             cursor='hand2'
         )
-        browse_btn.pack(side='right')
+        browse_btn.pack(side='left', padx=(0, 10))
+        
+        # Clear selection button
+        clear_btn = tk.Button(
+            button_frame,
+            text="Clear All",
+            command=self.clear_selection,
+            font=('Segoe UI', 10, 'bold'),
+            bg=self.colors['warning'],
+            fg=self.colors['text'],
+            relief='flat',
+            bd=0,
+            padx=20,
+            pady=10,
+            cursor='hand2'
+        )
+        clear_btn.pack(side='left', padx=(0, 10))
+        
+        # Remove selected button
+        remove_btn = tk.Button(
+            button_frame,
+            text="Remove Selected",
+            command=self.remove_selected_image,
+            font=('Segoe UI', 10, 'bold'),
+            bg='#d13438',  # Red color
+            fg=self.colors['text'],
+            relief='flat',
+            bd=0,
+            padx=20,
+            pady=10,
+            cursor='hand2'
+        )
+        remove_btn.pack(side='left')
+        
+        # Selected images display
+        self.images_display_frame = tk.Frame(input_container, bg=self.colors['surface'])
+        self.images_display_frame.pack(fill='x')
+        
+        # Status label for selected images
+        self.selected_count_label = tk.Label(
+            self.images_display_frame,
+            text="No images selected",
+            font=('Segoe UI', 10),
+            fg=self.colors['text_secondary'],
+            bg=self.colors['surface']
+        )
+        self.selected_count_label.pack(anchor='w', pady=(5, 10))
+        
+        # Scrollable frame for image grid
+        self.create_scrollable_image_grid()
         
         # Hover effects
         self.add_hover_effect(browse_btn, self.colors['primary'], self.colors['primary_hover'])
+        self.add_hover_effect(clear_btn, self.colors['warning'], '#e67c00')
+        self.add_hover_effect(remove_btn, '#d13438', '#b12328')
+    
+    def create_scrollable_image_grid(self):
+        """Create scrollable grid for image previews"""
+        # Main container for scrollable content
+        canvas_container = tk.Frame(self.images_display_frame, bg=self.colors['surface'])
+        canvas_container.pack(fill='both', expand=True)
+        
+        # Canvas for scrolling
+        self.image_canvas = tk.Canvas(
+            canvas_container,
+            bg=self.colors['surface'],
+            height=200,  # Fixed height for preview area
+            highlightthickness=0
+        )
+        
+        # Scrollbar for canvas
+        scrollbar_v = tk.Scrollbar(canvas_container, orient='vertical', command=self.image_canvas.yview)
+        self.image_canvas.configure(yscrollcommand=scrollbar_v.set)
+        
+        # Scrollable frame inside canvas
+        self.scrollable_frame = tk.Frame(self.image_canvas, bg=self.colors['surface'])
+        self.canvas_window = self.image_canvas.create_window((0, 0), window=self.scrollable_frame, anchor='nw')
+        
+        # Pack canvas and scrollbar
+        self.image_canvas.pack(side='left', fill='both', expand=True)
+        scrollbar_v.pack(side='right', fill='y')
+        
+        # Bind mousewheel to canvas
+        self.image_canvas.bind('<Configure>', self._on_canvas_configure)
+        self.scrollable_frame.bind('<Configure>', self._on_frame_configure)
+        
+        # Bind mousewheel events
+        self._bind_mousewheel()
+    
+    def _on_canvas_configure(self, event):
+        """Handle canvas resize"""
+        self.image_canvas.itemconfig(self.canvas_window, width=event.width)
+    
+    def _on_frame_configure(self, event):
+        """Handle frame resize"""
+        self.image_canvas.configure(scrollregion=self.image_canvas.bbox('all'))
+    
+    def _bind_mousewheel(self):
+        """Bind mousewheel events for scrolling"""
+        def _on_mousewheel(event):
+            self.image_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def _bind_to_mousewheel(event):
+            self.image_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        
+        def _unbind_from_mousewheel(event):
+            self.image_canvas.unbind_all("<MouseWheel>")
+        
+        self.image_canvas.bind('<Enter>', _bind_to_mousewheel)
+        self.image_canvas.bind('<Leave>', _unbind_from_mousewheel)
+    
+    def create_image_thumbnail(self, image_path, size=(120, 120)):
+        """Create thumbnail from image path"""
+        try:
+            with Image.open(image_path) as img:
+                # Convert to RGB if necessary (for PNG with transparency, etc.)
+                if img.mode in ('RGBA', 'LA'):
+                    # Create a white background
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'RGBA':
+                        background.paste(img, mask=img.split()[-1])  # Use alpha channel as mask
+                    else:
+                        background.paste(img)
+                    img = background
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Create thumbnail maintaining aspect ratio
+                img.thumbnail(size, Image.Resampling.LANCZOS)
+                
+                # Create a new image with fixed size and center the thumbnail
+                thumb = Image.new('RGB', size, (45, 45, 45))  # Dark background
+                x = (size[0] - img.width) // 2
+                y = (size[1] - img.height) // 2
+                thumb.paste(img, (x, y))
+                
+                return thumb
+        except Exception as e:
+            # Return a placeholder image if thumbnail creation fails
+            placeholder = Image.new('RGB', size, (100, 100, 100))
+            return placeholder
+    
+    def create_image_preview_widget(self, image_path, index):
+        """Create a preview widget for an image"""
+        # Create container frame
+        preview_frame = tk.Frame(
+            self.scrollable_frame,
+            bg=self.colors['bg'],
+            relief='solid',
+            bd=2,
+            cursor='hand2',
+            padx=5,
+            pady=5
+        )
+        
+        # Create thumbnail
+        thumbnail = self.create_image_thumbnail(image_path)
+        
+        # Convert PIL image to PhotoImage
+        import io
+        import base64
+        
+        # Save thumbnail to bytes and convert to base64
+        img_bytes = io.BytesIO()
+        thumbnail.save(img_bytes, format='PNG')
+        img_bytes.seek(0)
+        img_data = base64.b64encode(img_bytes.read())
+        
+        # Create PhotoImage from base64 data
+        photo = tk.PhotoImage(data=img_data)
+        
+        # Image label
+        img_label = tk.Label(
+            preview_frame,
+            image=photo,
+            bg=self.colors['bg'],
+            cursor='hand2'
+        )
+        img_label.image = photo  # Keep reference
+        img_label.pack(pady=5)
+        
+        # Filename label
+        filename = os.path.basename(image_path)
+        if len(filename) > 15:
+            display_name = filename[:12] + "..."
+        else:
+            display_name = filename
+            
+        name_label = tk.Label(
+            preview_frame,
+            text=display_name,
+            font=('Segoe UI', 8),
+            fg=self.colors['text'],
+            bg=self.colors['bg'],
+            cursor='hand2'
+        )
+        name_label.pack(pady=(0, 5))
+        
+        # Store references
+        preview_frame.image_path = image_path
+        preview_frame.index = index
+        preview_frame.selected = False
+        
+        # Bind click events
+        def on_click(event):
+            self.toggle_image_selection(preview_frame)
+        
+        preview_frame.bind('<Button-1>', on_click)
+        img_label.bind('<Button-1>', on_click)
+        name_label.bind('<Button-1>', on_click)
+        
+        return preview_frame
+    
+    def toggle_image_selection(self, widget):
+        """Toggle selection state of an image widget"""
+        if widget.selected:
+            # Deselect
+            widget.selected = False
+            widget.config(
+                bg=self.colors['bg'], 
+                highlightbackground=self.colors['bg'],
+                relief='solid',
+                bd=2
+            )
+            # Update all child widgets
+            for child in widget.winfo_children():
+                child.config(bg=self.colors['bg'])
+            if widget in self.selected_image_widgets:
+                self.selected_image_widgets.remove(widget)
+        else:
+            # Select
+            widget.selected = True
+            widget.config(
+                bg=self.colors['primary'], 
+                highlightbackground=self.colors['primary'],
+                relief='solid',
+                bd=3
+            )
+            # Update all child widgets
+            for child in widget.winfo_children():
+                child.config(bg=self.colors['primary'])
+            self.selected_image_widgets.append(widget)
         
     def create_presets_section(self, parent):
         """Create presets section with only Hero and Product"""
@@ -277,6 +509,63 @@ class ImageResizerApp:
         
         # Hover effect
         self.add_hover_effect(location_btn, self.colors['warning'], '#e67c00')
+    
+    def create_progress_section(self, parent):
+        """Create progress section for batch processing"""
+        self.progress_section_frame = tk.Frame(parent, bg=self.colors['bg'])
+        self.progress_section_frame.pack(fill='x', pady=(0, 25))
+        self.progress_section_frame.pack_forget()  # Hide initially
+        
+        # Section title
+        progress_title = tk.Label(
+            self.progress_section_frame,
+            text="Processing Progress",
+            font=('Segoe UI', 14, 'bold'),
+            fg=self.colors['text'],
+            bg=self.colors['bg']
+        )
+        progress_title.pack(anchor='w', pady=(0, 10))
+        
+        # Progress container
+        progress_container = tk.Frame(
+            self.progress_section_frame,
+            bg=self.colors['surface'],
+            relief='solid',
+            bd=1,
+            highlightbackground=self.colors['border'],
+            highlightthickness=1
+        )
+        progress_container.pack(fill='x', ipady=15, ipadx=15)
+        
+        # Progress label
+        self.progress_label = tk.Label(
+            progress_container,
+            text="Ready to process",
+            font=('Segoe UI', 11),
+            fg=self.colors['text'],
+            bg=self.colors['surface']
+        )
+        self.progress_label.pack(anchor='w', pady=(0, 10))
+        
+        # Progress bar
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(
+            progress_container,
+            variable=self.progress_var,
+            mode='determinate',
+            length=400
+        )
+        self.progress_bar.pack(fill='x', pady=(0, 5))
+        
+        # Progress percentage
+        self.progress_percent_label = tk.Label(
+            progress_container,
+            text="0%",
+            font=('Segoe UI', 10),
+            fg=self.colors['text_secondary'],
+            bg=self.colors['surface']
+        )
+        self.progress_percent_label.pack(anchor='w')
         
     def create_action_button(self, parent):
         """Create the main action button"""
@@ -285,7 +574,7 @@ class ImageResizerApp:
         
         self.resize_button = tk.Button(
             button_frame,
-            text="Resize Image",
+            text="Resize Images",
             command=self.resize_action,
             font=('Segoe UI', 14, 'bold'),
             bg=self.colors['success'],
@@ -303,7 +592,6 @@ class ImageResizerApp:
         self.add_hover_effect(self.resize_button, self.colors['success'], '#0e6b0e')
         
         # Bind input changes to enable/disable button
-        self.input_path_var.trace('w', self.validate_inputs)
         self.output_path_var.trace('w', self.validate_inputs)
         self.width_var.trace('w', self.validate_inputs)
         self.height_var.trace('w', self.validate_inputs)
@@ -323,7 +611,7 @@ class ImageResizerApp:
         
     def validate_inputs(self, *args):
         """Enable/disable resize button based on inputs"""
-        if (self.input_path_var.get().strip() and 
+        if (len(self.selected_images) > 0 and 
             self.output_path_var.get().strip() and 
             self.width_var.get().strip() and 
             self.height_var.get().strip()):
@@ -342,10 +630,10 @@ class ImageResizerApp:
         self.width_var.set(str(width))
         self.height_var.set(str(height))
         
-    def open_file(self):
-        """Open file dialog to select image"""
-        file_path = filedialog.askopenfilename(
-            title="Select an image to resize",
+    def open_multiple_files(self):
+        """Open file dialog to select multiple images"""
+        file_paths = filedialog.askopenfilenames(
+            title="Select images to resize",
             filetypes=[
                 ("All Images", "*.jpg *.jpeg *.png *.bmp *.gif *.tiff *.webp"),
                 ("JPEG files", "*.jpg *.jpeg"),
@@ -357,58 +645,126 @@ class ImageResizerApp:
                 ("All files", "*.*")
             ]
         )
-        if file_path:
-            self.input_path_var.set(file_path)
+        if file_paths:
+            # Add new files to existing selection (avoid duplicates)
+            for file_path in file_paths:
+                if file_path not in self.selected_images:
+                    self.selected_images.append(file_path)
             
-            # Auto-suggest output location with better path handling
-            if not self.output_path_var.get().strip():
-                directory = os.path.dirname(file_path)
-                name, ext = os.path.splitext(os.path.basename(file_path))
-                suggested_output = os.path.join(directory, f"{name}_resized{ext}")
-                self.output_path_var.set(suggested_output)
+            self.update_images_display()
+            
+            # Auto-suggest output location if not set
+            if not self.output_path_var.get().strip() and self.selected_images:
+                directory = os.path.dirname(self.selected_images[0])
+                self.output_path_var.set(directory)
+    
+    def clear_selection(self):
+        """Clear all selected images"""
+        self.selected_images = []
+        self.update_images_display()
+    
+    def remove_selected_image(self):
+        """Remove currently selected images from grid"""
+        if self.selected_image_widgets:
+            # Get indices of selected widgets and sort in reverse order
+            indices_to_remove = []
+            for widget in self.selected_image_widgets:
+                if hasattr(widget, 'index') and widget.index < len(self.selected_images):
+                    indices_to_remove.append(widget.index)
+            
+            # Sort in reverse order to avoid index shifting issues
+            indices_to_remove.sort(reverse=True)
+            
+            # Remove images
+            for index in indices_to_remove:
+                if 0 <= index < len(self.selected_images):
+                    self.selected_images.pop(index)
+            
+            self.update_images_display()
+        else:
+            messagebox.showinfo("No Selection", "Please click on images to select them for removal.")
+    
+    def update_images_display(self):
+        """Update the display of selected images with grid layout"""
+        # Clear existing widgets
+        for widget in self.image_preview_widgets:
+            widget.destroy()
+        self.image_preview_widgets.clear()
+        self.selected_image_widgets.clear()
+        
+        # Update count label
+        count = len(self.selected_images)
+        if count == 0:
+            self.selected_count_label.config(text="No images selected")
+        elif count == 1:
+            self.selected_count_label.config(text="1 image selected")
+        else:
+            self.selected_count_label.config(text=f"{count} images selected")
+        
+        # Create grid of image previews
+        if self.selected_images:
+            cols = 3  # Number of columns in grid
+            for i, img_path in enumerate(self.selected_images):
+                row = i // cols
+                col = i % cols
+                
+                # Create preview widget
+                preview_widget = self.create_image_preview_widget(img_path, i)
+                preview_widget.grid(row=row, column=col, padx=5, pady=5, sticky='n')
+                
+                self.image_preview_widgets.append(preview_widget)
+        
+        # Update scroll region
+        self.scrollable_frame.update_idletasks()
+        self.image_canvas.configure(scrollregion=self.image_canvas.bbox('all'))
+        
+        # Validate inputs after updating selection
+        self.validate_inputs()
                 
     def choose_save_location(self):
-        """Choose where to save the resized image"""
-        # Get initial values
-        input_path = self.input_path_var.get().strip()
-        current_output = self.output_path_var.get().strip()
+        """Choose where to save the resized images"""
+        # For multiple images, choose a folder
+        if len(self.selected_images) > 1:
+            folder_path = filedialog.askdirectory(
+                title="Choose folder to save resized images",
+                initialdir=os.path.dirname(self.selected_images[0]) if self.selected_images else os.getcwd()
+            )
+            if folder_path:
+                self.output_path_var.set(folder_path)
         
-        # Determine initial directory and filename
-        if input_path and os.path.exists(input_path):
+        # For single image, choose specific file
+        elif len(self.selected_images) == 1:
+            input_path = self.selected_images[0]
             initial_dir = os.path.dirname(input_path)
             name, ext = os.path.splitext(os.path.basename(input_path))
             default_filename = f"{name}_resized{ext}"
-        elif current_output:
-            initial_dir = os.path.dirname(current_output) if os.path.dirname(current_output) else os.getcwd()
-            default_filename = os.path.basename(current_output)
-            ext = os.path.splitext(default_filename)[1] if os.path.splitext(default_filename)[1] else '.jpg'
+            
+            file_path = filedialog.asksaveasfilename(
+                title="Choose where to save the resized image",
+                initialdir=initial_dir,
+                initialfile=default_filename,
+                defaultextension=ext,
+                filetypes=[
+                    ("JPEG files", "*.jpg"),
+                    ("PNG files", "*.png"),
+                    ("BMP files", "*.bmp"),
+                    ("GIF files", "*.gif"),
+                    ("TIFF files", "*.tiff"),
+                    ("WebP files", "*.webp"),
+                    ("All files", "*.*")
+                ]
+            )
+            if file_path:
+                self.output_path_var.set(file_path)
+        
+        # No images selected
         else:
-            initial_dir = os.getcwd()
-            default_filename = "resized_image.jpg"
-            ext = '.jpg'
-        
-        # Ensure initial directory exists
-        if not os.path.exists(initial_dir):
-            initial_dir = os.getcwd()
-        
-        file_path = filedialog.asksaveasfilename(
-            title="Choose where to save the resized image",
-            initialdir=initial_dir,
-            initialfile=default_filename,
-            defaultextension=ext,
-            filetypes=[
-                ("JPEG files", "*.jpg"),
-                ("PNG files", "*.png"),
-                ("BMP files", "*.bmp"),
-                ("GIF files", "*.gif"),
-                ("TIFF files", "*.tiff"),
-                ("WebP files", "*.webp"),
-                ("All files", "*.*")
-            ]
-        )
-        
-        if file_path:
-            self.output_path_var.set(file_path)
+            folder_path = filedialog.askdirectory(
+                title="Choose output folder",
+                initialdir=os.getcwd()
+            )
+            if folder_path:
+                self.output_path_var.set(folder_path)
             
     def resize_image(self, input_path, output_path, width, height):
         """Resize image with high quality"""
@@ -452,33 +808,16 @@ class ImageResizerApp:
             return False
             
     def resize_action(self):
-        """Handle resize button click"""
-        input_path = self.input_path_var.get().strip()
-        output_path = self.output_path_var.get().strip()
-        
+        """Handle resize button click for batch processing"""
         # Validation
-        if not input_path:
-            messagebox.showerror("Error", "Please select an input image.")
+        if not self.selected_images:
+            messagebox.showerror("Error", "Please select images to resize.")
             return
             
-        if not os.path.exists(input_path):
-            messagebox.showerror("Error", "The selected input file does not exist.")
-            return
-            
+        output_path = self.output_path_var.get().strip()
         if not output_path:
             messagebox.showerror("Error", "Please choose an output location.")
             return
-            
-        # Check if input and output are the same file
-        try:
-            if os.path.abspath(input_path) == os.path.abspath(output_path):
-                result = messagebox.askyesno("Overwrite Warning", 
-                    "The output path is the same as the input file.\n\n"
-                    "This will overwrite the original image. Continue?")
-                if not result:
-                    return
-        except:
-            pass  # If path comparison fails, continue anyway
             
         # Validate dimensions
         try:
@@ -498,7 +837,19 @@ class ImageResizerApp:
         except ValueError as e:
             messagebox.showerror("Error", "Please enter valid dimensions (positive integers).")
             return
-            
+        
+        # Start batch processing
+        self.process_batch_resize(width, height, output_path)
+    
+    def process_batch_resize(self, width, height, output_location):
+        """Process multiple images with progress tracking"""
+        total_images = len(self.selected_images)
+        successful_resizes = 0
+        failed_resizes = []
+        
+        # Show progress section
+        self.progress_section_frame.pack(fill='x', pady=(0, 25))
+        
         # Disable button during processing
         original_text = self.resize_button.cget('text')
         self.resize_button.config(
@@ -506,33 +857,91 @@ class ImageResizerApp:
             text="Processing...",
             bg='#666666'
         )
+        
+        # Initialize progress
+        self.progress_var.set(0)
+        self.progress_percent_label.config(text="0%")
+        self.progress_label.config(text="Starting batch resize...")
         self.root.update()
         
         try:
-            # Perform resize
-            success = self.resize_image(input_path, output_path, width, height)
-            
-            if success:
-                # Show success message
-                result = messagebox.askyesno("Success", 
-                    f"✅ Image resized successfully!\n\n"
-                    f"Original: {os.path.basename(input_path)}\n"
-                    f"Resized: {os.path.basename(output_path)}\n"
-                    f"New Size: {width} × {height} pixels\n\n"
-                    f"Open the folder containing the resized image?")
+            for i, input_path in enumerate(self.selected_images):
+                # Update progress
+                progress_percent = int((i / total_images) * 100)
+                self.progress_var.set(progress_percent)
+                self.progress_percent_label.config(text=f"{progress_percent}%")
                 
-                if result:
-                    # Open folder containing the file
-                    folder_path = os.path.dirname(output_path)
-                    self.open_folder(folder_path)
-                            
+                filename = os.path.basename(input_path)
+                self.progress_label.config(text=f"Processing: {filename} ({i+1}/{total_images})")
+                self.root.update()
+                
+                # Determine output path for this image
+                if total_images == 1 and not os.path.isdir(output_location):
+                    # Single image, specific file path
+                    current_output_path = output_location
+                else:
+                    # Multiple images or folder selected, create filename
+                    name, ext = os.path.splitext(os.path.basename(input_path))
+                    output_filename = f"{name}_resized{ext}"
+                    current_output_path = os.path.join(output_location, output_filename)
+                
+                # Resize image
+                success = self.resize_image(input_path, current_output_path, width, height)
+                
+                if success:
+                    successful_resizes += 1
+                else:
+                    failed_resizes.append(filename)
+            
+            # Final progress update
+            self.progress_var.set(100)
+            self.progress_percent_label.config(text="100%")
+            self.progress_label.config(text="Batch resize completed!")
+            self.root.update()
+            
+            # Show completion message
+            if failed_resizes:
+                message = f"✅ Batch resize completed!\n\n"
+                message += f"Successfully resized: {successful_resizes}/{total_images} images\n"
+                message += f"Failed: {len(failed_resizes)} images\n"
+                message += f"New Size: {width} × {height} pixels\n\n"
+                message += f"Failed files:\n" + "\n".join(failed_resizes[:5])
+                if len(failed_resizes) > 5:
+                    message += f"\n... and {len(failed_resizes) - 5} more"
+                message += f"\n\nOpen the output folder?"
+                
+                result = messagebox.askyesno("Batch Resize Completed", message)
+            else:
+                result = messagebox.askyesno("Success", 
+                    f"✅ All images resized successfully!\n\n"
+                    f"Processed: {successful_resizes} images\n"
+                    f"New Size: {width} × {height} pixels\n\n"
+                    f"Open the output folder?")
+            
+            if result:
+                # Open output folder
+                if total_images == 1 and not os.path.isdir(output_location):
+                    folder_path = os.path.dirname(output_location)
+                else:
+                    folder_path = output_location
+                self.open_folder(folder_path)
+            
+            # Clear selection automatically after successful batch resize
+            if successful_resizes > 0:
+                self.clear_selection()
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred during batch processing:\n{str(e)}")
+        
         finally:
-            # Re-enable button
+            # Re-enable button and hide progress
             self.resize_button.config(
                 state='normal', 
                 text=original_text,
                 bg=self.colors['success']
             )
+            # Keep progress visible for a moment, then hide
+            self.root.after(3000, self.progress_section_frame.pack_forget)
     
     def open_folder(self, folder_path):
         """Open folder in file explorer (cross-platform)"""
