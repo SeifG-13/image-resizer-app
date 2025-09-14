@@ -80,7 +80,7 @@ For very large images or batches:
 
 ## 🔄 Version History
 
-See [Releases](https://github.com/SeifG-13/image-resizer-app/releases) for changelog and download links.
+See [Releases] (https://github.com/SeifG-13/image-resizer-app/releases) for changelog and download links.
 
 ## 👨‍💻 Development
 
