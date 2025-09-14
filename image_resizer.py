@@ -381,13 +381,14 @@ class ImageResizerApp:
             self.selected_image_widgets.append(widget)
         
     def create_presets_section(self, parent):
-        """Create presets section with only Hero and Product"""
+        """Create presets section with Hero, Product, and Hero Image"""
         presets_container = tk.Frame(parent, bg=self.colors['surface'])
         presets_container.pack(fill='x')
         
         presets = [
             ("Hero (1259 × 1008)", 1259, 1008),
-            ("Product (390 × 450)", 390, 450)
+            ("Product (390 × 450)", 390, 450),
+            ("Hero Image (1600 × 500)", 1600, 500)
         ]
         
         for i, (name, w, h) in enumerate(presets):
@@ -405,8 +406,11 @@ class ImageResizerApp:
                 cursor='hand2'
             )
             
+            # Adjust padding for three buttons
             if i == 0:
-                btn.pack(side='left', padx=(0, 10), expand=True, fill='x')
+                btn.pack(side='left', padx=(0, 5), expand=True, fill='x')
+            elif i == 1:
+                btn.pack(side='left', padx=(0, 5), expand=True, fill='x')
             else:
                 btn.pack(side='left', expand=True, fill='x')
                 
